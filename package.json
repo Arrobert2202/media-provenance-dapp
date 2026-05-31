@@ -1,0 +1,27 @@
+{
+  "name": "disertatie",
+  "version": "1.0.0",
+  "description": "A decentralised image traceability system. Journalists anchor a perceptual hash of an original photograph on-chain. Anyone can later verify whether a circulating image matches the registered original, even after lossy re-compression.",
+  "main": "hardhat.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arrobert2202/media-provenance-dapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Arrobert2202/media-provenance-dapp/issues"
+  },
+  "homepage": "https://github.com/Arrobert2202/media-provenance-dapp#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.1.6",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.6",
+    "hardhat": "^3.5.1",
+    "viem": "^2.51.0"
+  }
+}

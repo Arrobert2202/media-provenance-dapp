@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff"];
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff", "application/pdf"];
 
 export default function ImageDropzone({ onFile, preview, label = "Drop image here or click to browse", disabled = false }) {
   const inputRef   = useRef(null);
@@ -9,7 +9,7 @@ export default function ImageDropzone({ onFile, preview, label = "Drop image her
   function handleFile(file) {
     if (!file) return;
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      alert("Please select a valid image file (JPEG, PNG, WEBP, BMP, TIFF).");
+      alert("Please select a valid file (JPEG, PNG, WEBP, BMP, TIFF, or PDF).");
       return;
     }
     onFile(file);
@@ -72,7 +72,7 @@ export default function ImageDropzone({ onFile, preview, label = "Drop image her
             </svg>
           </div>
           <p className="text-sm text-slate-400">{label}</p>
-          <p className="text-xs text-slate-600">JPEG · PNG · WEBP · BMP · TIFF — max 20 MB</p>
+          <p className="text-xs text-slate-600">JPEG · PNG · WEBP · BMP · TIFF · PDF — max 20 MB</p>
         </div>
       )}
     </div>

@@ -7,6 +7,18 @@ const path      = require("path");
 const fs        = require("fs");
 const { spawn } = require("child_process");
 const { v4: uuidv4 } = require("uuid");
+const { ethers } = require("ethers");
+
+const RPC_URL          = process.env.RPC_URL || "http://127.0.0.1:8545";
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const PRIVATE_KEY      = process.env.PRIVATE_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+const artifactPath = path.resolve(__dirname, "..", "artifacts", "contracts", "ImageRegistry.sol", "ImageRegistry.json");
+const { abi: CONTRACT_ABI } = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+
+const provider = new ethers.JsonRpcProvider(RPC_URL);
+const signer   = new ethers.Wallet(PRIVATE_KEY, provider);
+const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -26,23 +38,13 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff"];
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff", "application/pdf"];
   allowed.includes(file.mimetype)
     ? cb(null, true)
-    : cb(new Error("Only image files are accepted (JPEG, PNG, WEBP, BMP, TIFF)."), false);
+    : cb(new Error("Only image files (JPEG, PNG, WEBP, BMP, TIFF) and PDFs are accepted."), false);
 };
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
-
-const registry = new Map();
-
-const SEED_PHASH = "demo_phash_replace_with_real_value";
-registry.set(SEED_PHASH, {
-  phash    : SEED_PHASH,
-  author   : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  timestamp: Math.floor(Date.now() / 1000) - 3600,
-  context  : "Protest in Piața Victoriei, Bucharest — 01/05/2026 18:30",
-});
 
 function computePHash(imagePath) {
   return new Promise((resolve, reject) => {
@@ -74,33 +76,39 @@ function computePHash(imagePath) {
 }
 
 function hammingDistance(hexA, hexB) {
-  if (hexA.length !== hexB.length) return Infinity;
-  let distance = 0;
-  for (let i = 0; i < hexA.length; i++) {
-    const xor = parseInt(hexA[i], 16) ^ parseInt(hexB[i], 16);
-    distance += xor.toString(2).split("").filter((b) => b === "1").length;
-  }
-  return distance;
-}
+  const partsA = hexA.split(":");
+  const partsB = hexB.split(":");
 
-function findSimilarRecord(queryHash, threshold = 10) {
-  let bestMatch = null;
-  let bestDist  = Infinity;
-
-  for (const [storedHash, record] of registry.entries()) {
-    if (storedHash === SEED_PHASH) continue;
-    const dist = hammingDistance(queryHash, storedHash);
-    if (dist <= threshold && dist < bestDist) {
-      bestDist  = dist;
-      bestMatch = { record, distance: dist };
+  if (partsA.length === 1 && partsB.length === 1) {
+    if (hexA.length !== hexB.length) return Infinity;
+    let dist = 0;
+    for (let i = 0; i < hexA.length; i++) {
+      const xor = parseInt(hexA[i], 16) ^ parseInt(hexB[i], 16);
+      dist += xor.toString(2).split("").filter((b) => b === "1").length;
     }
+    return dist;
   }
-  return bestMatch;
+
+  if (partsA.length !== partsB.length) return Infinity;
+
+  let maxDist = 0;
+  for (let p = 0; p < partsA.length; p++) {
+    const pa = partsA[p];
+    const pb = partsB[p];
+    if (pa.length !== pb.length) return Infinity;
+    let pageDist = 0;
+    for (let i = 0; i < pa.length; i++) {
+      const xor = parseInt(pa[i], 16) ^ parseInt(pb[i], 16);
+      pageDist += xor.toString(2).split("").filter((b) => b === "1").length;
+    }
+    if (pageDist > maxDist) maxDist = pageDist;
+  }
+  return maxDist;
 }
 
-function deleteTempFile(filePath) {
+function cleanup(filePath) {
   fs.unlink(filePath, (err) => {
-    if (err) console.warn(`[cleanup] Could not delete: ${filePath}`);
+    if (err) console.warn(`[cleanup] ${filePath}`);
   });
 }
 
@@ -109,44 +117,49 @@ app.post("/api/anchor", upload.single("image"), async (req, res) => {
     return res.status(400).json({ success: false, error: "No image file provided." });
   }
 
-  const { context, author } = req.body;
+  const { context } = req.body;
 
   if (!context || context.trim() === "") {
-    deleteTempFile(req.file.path);
+    cleanup(req.file.path);
     return res.status(400).json({ success: false, error: "Context field is required." });
   }
-
-  const walletAddress = author?.trim() || `0x${uuidv4().replace(/-/g, "").slice(0, 40)}`;
 
   try {
     console.log(`[anchor] ${req.file.originalname}`);
     const phash = await computePHash(req.file.path);
 
-    if (registry.has(phash)) {
-      deleteTempFile(req.file.path);
-      const existing = registry.get(phash);
+    const alreadyAnchored = await contract.hasBeenAnchored(phash);
+    if (alreadyAnchored) {
+      cleanup(req.file.path);
+      const allRecords = await contract.getAllRecords();
+      const existing = allRecords.find((r) => r.phash === phash);
       return res.status(409).json({
         success  : false,
         duplicate: true,
         error    : "This image (or a visually identical one) is already registered.",
-        existing : { phash: existing.phash, author: existing.author, timestamp: existing.timestamp, context: existing.context },
+        existing : existing
+          ? { phash: existing.phash, author: existing.author, timestamp: Number(existing.timestamp), context: existing.context }
+          : null,
       });
     }
 
-    const timestamp   = Math.floor(Date.now() / 1000);
-    const txHash      = "0x" + Buffer.from(uuidv4().replace(/-/g, ""), "hex").toString("hex").padEnd(64, "0");
-    const blockNumber = Math.floor(Math.random() * 1_000_000) + 19_000_000;
+    // Anchor on-chain
+    const tx = await contract.anchorImage(phash, context.trim());    const receipt = await tx.wait();
 
-    registry.set(phash, { phash, author: walletAddress, timestamp, context: context.trim() });
-
-    deleteTempFile(req.file.path);
+    cleanup(req.file.path);
     return res.status(201).json({
-      success: true, phash, author: walletAddress, timestamp,
-      context: context.trim(), txHash, blockNumber, duplicate: false,
+      success    : true,
+      phash,
+      author     : signer.address,
+      timestamp  : Math.floor(Date.now() / 1000),
+      context    : context.trim(),
+      txHash     : receipt.hash,
+      blockNumber: Number(receipt.blockNumber),
+      duplicate  : false,
     });
   } catch (err) {
     console.error("[anchor]", err.message);
-    deleteTempFile(req.file.path);
+    cleanup(req.file.path);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -160,32 +173,51 @@ app.post("/api/verify", upload.single("image"), async (req, res) => {
     console.log(`[verify] ${req.file.originalname}`);
     const phash = await computePHash(req.file.path);
 
-    if (registry.has(phash)) {
-      const record = registry.get(phash);
-      deleteTempFile(req.file.path);
-      return res.status(200).json({ success: true, verified: true, phash, distance: 0, record });
+    const allRecords = await contract.getAllRecords();
+
+    let bestMatch = null;
+    let bestDist  = Infinity;
+
+    for (const record of allRecords) {
+      const dist = hammingDistance(phash, record.phash);
+      if (dist <= 10 && dist < bestDist) {
+        bestDist  = dist;
+        bestMatch = {
+          phash    : record.phash,
+          author   : record.author,
+          timestamp: Number(record.timestamp),
+          context  : record.context,
+        };
+      }
     }
 
-    const match = findSimilarRecord(phash);
-    deleteTempFile(req.file.path);
+    cleanup(req.file.path);
 
-    if (match) {
+    if (bestMatch) {
       return res.status(200).json({
-        success: true, verified: true, phash,
-        distance: match.distance, record: match.record,
+        success : true,
+        verified: true,
+        phash,
+        distance: bestDist,
+        record  : bestMatch,
       });
     }
 
     return res.status(200).json({ success: true, verified: false, phash, distance: null, record: null });
   } catch (err) {
     console.error("[verify]", err.message);
-    deleteTempFile(req.file.path);
+    cleanup(req.file.path);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", registrySize: registry.size });
+app.get("/api/health", async (req, res) => {
+  try {
+    const count = await contract.getRecordCount();
+    res.json({ status: "ok", registrySize: Number(count) });
+  } catch (err) {
+    res.json({ status: "degraded", error: err.message, registrySize: 0 });
+  }
 });
 
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
@@ -193,7 +225,7 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   res.status(400).json({ success: false, error: err.message });
 });
 
-module.exports = { app, registry };
+module.exports = { app };
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`API listening on port ${PORT}`));

@@ -46,3 +46,13 @@ desktop.ini
 *.ntvs*
 *.njsproj
 *.sln
+
+# ── Hardhat ───────────────────────────────────────────────────
+artifacts/
+cache/
+ignition/deployments/
+
+# ── Test images (root level) ───────────────────────────────────
+/different.png
+/original.png
+/wapp_download.jpeg

@@ -17,27 +17,27 @@ function VerifiedCard({ data }) {
           </svg>
         </div>
         <div>
-          <h2 className="text-lg font-bold text-emerald-300">Imagine Verificată ✓</h2>
+          <h2 className="text-lg font-bold text-emerald-300">Verified Image ✓</h2>
           <p className="text-sm text-emerald-600 mt-0.5">
             {distance === 0
-              ? "Potrivire exactă găsită în registrul blockchain."
-              : `Potrivire apropiată găsită (distanță Hamming: ${distance} biți). Imaginea a fost probabil comprimată.`}
+              ? "Exact match found in the blockchain registry."
+              : `Close match found (Hamming distance: ${distance} bits). The image was likely compressed.`}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <InfoRow label="Sursă (Autor)" value={record.author} mono />
-        <InfoRow label="Ancorat la" value={anchoredDate} />
-        {ctxDate        && <InfoRow label="Data evenimentului" value={ctxDate} />}
-        {ctxLocation    && <InfoRow label="Locație" value={ctxLocation} />}
-        {ctxDescription && <InfoRow label="Descriere originală" value={ctxDescription} className="sm:col-span-2" />}
-        <InfoRow label="pHash imagine încărcată" value={phash} mono className="sm:col-span-2" />
-        <InfoRow label="pHash înregistrat" value={record.phash} mono className="sm:col-span-2" />
+        <InfoRow label="Source (Author)" value={record.author} mono />
+        <InfoRow label="Anchored At" value={anchoredDate} />
+        {ctxDate        && <InfoRow label="Event Date" value={ctxDate} />}
+        {ctxLocation    && <InfoRow label="Location" value={ctxLocation} />}
+        {ctxDescription && <InfoRow label="Original Description" value={ctxDescription} className="sm:col-span-2" />}
+        <InfoRow label="Uploaded Image pHash" value={phash} mono className="sm:col-span-2" />
+        <InfoRow label="Registered pHash" value={record.phash} mono className="sm:col-span-2" />
       </div>
 
       <p className="mt-5 text-xs text-emerald-700 border-t border-emerald-800/50 pt-4">
-        Verificare simulată. În producție, înregistrarea ar fi citită direct din <code className="font-mono">ImageRegistry.sol</code>.
+        Simulated verification. In production, the record would be read directly from <code className="font-mono">ImageRegistry.sol</code>.
       </p>
     </div>
   );
@@ -63,17 +63,17 @@ function DisinformationWarning({ phash }) {
           </svg>
         </div>
         <div>
-          <p className="text-xl font-bold text-red-400 leading-snug">Imagine neverificată.</p>
-          <p className="text-xl font-bold text-red-400 leading-snug">Sursă necunoscută.</p>
-          <p className="text-xl font-bold text-red-400 leading-snug">Risc ridicat de dezinformare.</p>
+          <p className="text-xl font-bold text-red-400 leading-snug">Unverified image.</p>
+          <p className="text-xl font-bold text-red-400 leading-snug">Unknown source.</p>
+          <p className="text-xl font-bold text-red-400 leading-snug">High risk of disinformation.</p>
         </div>
       </div>
 
       <div className="bg-red-900/20 rounded-xl p-4 border border-red-800/40 mb-4">
         <p className="text-sm text-red-300 leading-relaxed">
-          Amprenta vizuală a acestei imagini <strong>nu a fost găsită</strong> în registrul blockchain.
-          Aceasta poate însemna că imaginea a fost modificată semnificativ, că provine dintr-o sursă
-          neînregistrată, sau că este fabricată.
+          The visual fingerprint of this image <strong>was not found</strong> in the blockchain registry.
+          This may mean the image has been significantly altered, originates from an unregistered source,
+          or has been fabricated.
         </p>
       </div>
 
@@ -83,7 +83,7 @@ function DisinformationWarning({ phash }) {
       </div>
 
       <p className="mt-4 text-xs text-red-800">
-        Verificare simulată. În producție, căutarea s-ar efectua direct pe blockchain prin <code className="font-mono">ImageRegistry.sol</code>.
+        Simulated verification. In production, the lookup would be performed directly on the blockchain via <code className="font-mono">ImageRegistry.sol</code>.
       </p>
     </div>
   );
