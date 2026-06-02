@@ -9,8 +9,8 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 PDF_EXTS = {".pdf"}
 
 
+# load just the first page of a pdf
 def _load_pdf_page(file_path: Path, dpi: int = 200) -> Image.Image:
-    """Render the first page of a PDF as a PIL Image."""
     from pdf2image import convert_from_path
     pages = convert_from_path(file_path, dpi=dpi, first_page=1, last_page=1)
     if not pages:
@@ -18,8 +18,8 @@ def _load_pdf_page(file_path: Path, dpi: int = 200) -> Image.Image:
     return pages[0]
 
 
+# load all pages of a pdf as a list of PIL images
 def _load_pdf_all(file_path: Path, dpi: int = 200) -> list:
-    """Render all pages of a PDF as PIL Images."""
     from pdf2image import convert_from_path
     pages = convert_from_path(file_path, dpi=dpi)
     if not pages:
@@ -27,13 +27,11 @@ def _load_pdf_all(file_path: Path, dpi: int = 200) -> list:
     return pages
 
 
+# compute the perceptual hash for an image or pdf
+# pdfs return colon-separated hashes per page, images return a single hash
 def compute_phash(src, hash_size: int = 16) -> str:
-    """
-    Compute perceptual hash for an image or PDF.
+    print(f"[phash] extracting hash (hash_size={hash_size})...")
 
-    PDFs return colon-separated per-page hashes: "h1:h2:...:hN".
-    Images return a single hash string.
-    """
     if isinstance(src, (str, Path)):
         p = Path(src)
         if not p.exists():
@@ -41,8 +39,11 @@ def compute_phash(src, hash_size: int = 16) -> str:
 
         ext = p.suffix.lower()
         if ext in PDF_EXTS:
+            # pdf: hash every page and join with colons
             pages = _load_pdf_all(p)
-            return ":".join(str(imagehash.phash(pg, hash_size=hash_size)) for pg in pages)
+            result = ":".join(str(imagehash.phash(pg, hash_size=hash_size)) for pg in pages)
+            print(f"[phash] pdf hash ({len(pages)} pages): {result}")
+            return result
         img = Image.open(p)
 
     elif isinstance(src, Image.Image):
@@ -52,11 +53,13 @@ def compute_phash(src, hash_size: int = 16) -> str:
     else:
         raise ValueError(f"Unsupported type: {type(src)}")
 
-    return str(imagehash.phash(img, hash_size=hash_size))
+    result = str(imagehash.phash(img, hash_size=hash_size))
+    print(f"[phash] hash result: {result}")
+    return result
 
 
+# simulate jpeg compression to mimic what whatsapp / social media does
 def simulate_compression(src, quality: int = 40) -> Image.Image:
-    """Simulate JPEG compression on an image (or first page of a PDF)."""
     if isinstance(src, (str, Path)):
         p = Path(src)
         if p.suffix.lower() in PDF_EXTS:
@@ -68,6 +71,7 @@ def simulate_compression(src, quality: int = 40) -> Image.Image:
     else:
         raise ValueError("src must be a file path or PIL.Image")
 
+    # convert to rgb so jpeg encoding works
     img = img.convert("RGB")
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=quality)
@@ -77,26 +81,27 @@ def simulate_compression(src, quality: int = 40) -> Image.Image:
     return compressed
 
 
+# count the number of differing bits between two hashes
+# for multi-page hashes, return the worst (max) distance across all pages
 def hamming_distance(hash_a: str, hash_b: str) -> int:
-    """
-    Hamming distance between two hashes.
-
-    Multi-page (colon-separated) hashes return the max distance across pages.
-    Mismatched page counts return 9999.
-    """
     parts_a = hash_a.split(":")
     parts_b = hash_b.split(":")
 
     if len(parts_a) == 1 and len(parts_b) == 1:
-        return imagehash.hex_to_hash(hash_a) - imagehash.hex_to_hash(hash_b)
+        dist = imagehash.hex_to_hash(hash_a) - imagehash.hex_to_hash(hash_b)
+        print(f"[hamming] distance is {dist}")
+        return dist
 
+    # mismatched page counts — can't compare
     if len(parts_a) != len(parts_b):
         return 9999
 
-    return max(
+    dist = max(
         imagehash.hex_to_hash(a) - imagehash.hex_to_hash(b)
         for a, b in zip(parts_a, parts_b)
     )
+    print(f"[hamming] max distance across {len(parts_a)} pages is {dist}")
+    return dist
 
 
 def run_comparison(img_path: str, quality: int = 40) -> None:
@@ -110,6 +115,7 @@ def run_comparison(img_path: str, quality: int = 40) -> None:
     max_bits = len(imagehash.hex_to_hash(first_orig).hash.flatten())
     similarity = (1 - dist / max_bits) * 100
 
+    # thresholds: <=10 match, <=20 uncertain, else no match
     if dist <= 10:
         verdict = "MATCH"
     elif dist <= 20:

@@ -98,25 +98,39 @@ export default function JournalistPortal() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    // validate required fields before doing anything
     const errors = validate();
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
 
     setLoading(true);
     setResult(null);
 
+    // build the multipart payload — image file + combined context string
     const formData = new FormData();
     formData.append("image",   file);
     formData.append("context", `${form.date} | ${form.location} | ${form.description}`);
     if (form.wallet.trim()) formData.append("author", form.wallet.trim());
 
+    console.log("[anchor] submitting image:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
+    console.log("[anchor] context:", `${form.date} | ${form.location} | ${form.description}`);
+
     try {
+      // POST to backend — python computes phash, then contract is called
       const { data } = await axios.post("/api/anchor", formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      console.log("[anchor] success! phash:", data.phash);
+      console.log("[anchor] tx hash:", data.txHash, "| block:", data.blockNumber);
+
       setResult({ type: "success", data });
     } catch (err) {
       const resp = err.response?.data;
       if (resp?.duplicate) {
+        // image already registered — show existing record
+        console.warn("[anchor] duplicate detected:", resp.existing?.phash);
         setResult({ type: "duplicate", data: resp.existing });
       } else {
+        console.error("[anchor] error:", resp?.error ?? err.message);
         setResult({ type: "error", message: resp?.error ?? err.message });
       }
     } finally {

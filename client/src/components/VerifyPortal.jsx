@@ -108,13 +108,26 @@ export default function VerifyPortal() {
     setLoading(true);
     setResult(null);
 
+    // send the suspicious image to the backend for phash extraction + registry lookup
     const formData = new FormData();
     formData.append("image", file);
 
+    console.log("[verify] sending image for verification:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
+
     try {
+      // backend computes phash and compares hamming distance against all on-chain records
       const { data } = await axios.post("/api/verify", formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      console.log("[verify] phash computed:", data.phash);
+      console.log("[verify] verified:", data.verified, "| distance:", data.distance);
+      if (data.record) {
+        console.log("[verify] matched record:", data.record);
+      }
+
+      // show result card based on whether a match was found
       setResult(data.verified ? { type: "verified", data } : { type: "unverified", phash: data.phash });
     } catch (err) {
+      console.error("[verify] error:", err.response?.data?.error ?? err.message);
       setResult({ type: "error", message: err.response?.data?.error ?? err.message });
     } finally {
       setLoading(false);
