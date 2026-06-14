@@ -27,10 +27,18 @@ def _load_pdf_all(file_path: Path, dpi: int = 200) -> list:
     return pages
 
 
-# compute the perceptual hash for an image or pdf
-# pdfs return colon-separated hashes per page, images return a single hash
+# compute dual hash (pHash + dHash) for a single image
+def _dual_hash_image(img, hash_size: int = 16) -> str:
+    ph = str(imagehash.phash(img, hash_size=hash_size))
+    dh = str(imagehash.dhash(img, hash_size=hash_size))
+    return f"{ph}|{dh}"
+
+
+# compute dual perceptual hash for an image or pdf
+# returns "phash|dhash" for images
+# returns "phash1|dhash1:phash2|dhash2:..." for multi-page pdfs
 def compute_phash(src, hash_size: int = 16) -> str:
-    print(f"[phash] extracting hash (hash_size={hash_size})...")
+    print(f"[phash] extracting dual hash (hash_size={hash_size})...")
 
     if isinstance(src, (str, Path)):
         p = Path(src)
@@ -39,10 +47,10 @@ def compute_phash(src, hash_size: int = 16) -> str:
 
         ext = p.suffix.lower()
         if ext in PDF_EXTS:
-            # pdf: hash every page and join with colons
+            # pdf: dual hash every page and join with colons
             pages = _load_pdf_all(p)
-            result = ":".join(str(imagehash.phash(pg, hash_size=hash_size)) for pg in pages)
-            print(f"[phash] pdf hash ({len(pages)} pages): {result}")
+            result = ":".join(_dual_hash_image(pg, hash_size=hash_size) for pg in pages)
+            print(f"[phash] pdf dual hash ({len(pages)} pages): {result}")
             return result
         img = Image.open(p)
 
@@ -53,8 +61,8 @@ def compute_phash(src, hash_size: int = 16) -> str:
     else:
         raise ValueError(f"Unsupported type: {type(src)}")
 
-    result = str(imagehash.phash(img, hash_size=hash_size))
-    print(f"[phash] hash result: {result}")
+    result = _dual_hash_image(img, hash_size=hash_size)
+    print(f"[phash] dual hash result: {result}")
     return result
 
 
@@ -81,38 +89,59 @@ def simulate_compression(src, quality: int = 40) -> Image.Image:
     return compressed
 
 
-# count the number of differing bits between two hashes
-# for multi-page hashes, return the worst (max) distance across all pages
+# compute hamming distance for a single pair of hex hash strings
+def _single_hamming(hex_a: str, hex_b: str) -> int:
+    return imagehash.hex_to_hash(hex_a) - imagehash.hex_to_hash(hex_b)
+
+
+# count the number of differing bits between two dual hashes
+# dual hash format: "phash|dhash"
+# returns max(phash_distance, dhash_distance)
+# for multi-page (colon-separated), returns the worst across all pages
 def hamming_distance(hash_a: str, hash_b: str) -> int:
-    parts_a = hash_a.split(":")
-    parts_b = hash_b.split(":")
+    # split by pages first
+    pages_a = hash_a.split(":")
+    pages_b = hash_b.split(":")
 
-    if len(parts_a) == 1 and len(parts_b) == 1:
-        dist = imagehash.hex_to_hash(hash_a) - imagehash.hex_to_hash(hash_b)
-        print(f"[hamming] distance is {dist}")
-        return dist
-
-    # mismatched page counts — can't compare
-    if len(parts_a) != len(parts_b):
+    # mismatched page counts
+    if len(pages_a) != len(pages_b):
         return 9999
 
-    dist = max(
-        imagehash.hex_to_hash(a) - imagehash.hex_to_hash(b)
-        for a, b in zip(parts_a, parts_b)
-    )
-    print(f"[hamming] max distance across {len(parts_a)} pages is {dist}")
-    return dist
+    max_dist = 0
+    for page_a, page_b in zip(pages_a, pages_b):
+        # split each page into phash and dhash components
+        parts_a = page_a.split("|")
+        parts_b = page_b.split("|")
+
+        if len(parts_a) == 2 and len(parts_b) == 2:
+            # dual hash: max of phash distance and dhash distance
+            ph_dist = _single_hamming(parts_a[0], parts_b[0])
+            dh_dist = _single_hamming(parts_a[1], parts_b[1])
+            page_dist = max(ph_dist, dh_dist)
+        elif len(parts_a) == 1 and len(parts_b) == 1:
+            # legacy single hash (backward compatibility)
+            page_dist = _single_hamming(parts_a[0], parts_b[0])
+        else:
+            # format mismatch
+            return 9999
+
+        if page_dist > max_dist:
+            max_dist = page_dist
+
+    print(f"[hamming] dual distance is {max_dist}")
+    return max_dist
 
 
 def run_comparison(img_path: str, quality: int = 40) -> None:
     orig_hash = compute_phash(img_path)
     comp_hash = compute_phash(simulate_compression(img_path, quality=quality))
 
-    first_orig = orig_hash.split(":")[0]
-    first_comp = comp_hash.split(":")[0] if ":" in comp_hash else comp_hash
+    dist = hamming_distance(orig_hash, comp_hash)
 
-    dist = imagehash.hex_to_hash(first_orig) - imagehash.hex_to_hash(first_comp)
-    max_bits = len(imagehash.hex_to_hash(first_orig).hash.flatten())
+    # extract just the phash part for bit count
+    first_ph = orig_hash.split(":")[0].split("|")[0]
+    max_bits = len(imagehash.hex_to_hash(first_ph).hash.flatten())
+
     similarity = (1 - dist / max_bits) * 100
 
     # thresholds: <=10 match, <=20 uncertain, else no match
@@ -126,7 +155,7 @@ def run_comparison(img_path: str, quality: int = 40) -> None:
     print(f"original   : {orig_hash}")
     if ":" in orig_hash:
         print(f"  ({orig_hash.count(':') + 1} pages hashed)")
-    print(f"compressed : {first_comp} (page 1 only)")
+    print(f"compressed : {comp_hash}")
     print(f"distance   : {dist}/{max_bits} bits ({similarity:.1f}% similar)")
     print(f"verdict    : {verdict}")
 

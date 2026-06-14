@@ -4,7 +4,7 @@ import ImageDropzone from "./ImageDropzone.jsx";
 import Spinner       from "./Spinner.jsx";
 
 function VerifiedCard({ data }) {
-  const { record, phash, distance } = data;
+  const { record, dualHash, distance } = data;
   const anchoredDate = new Date(record.timestamp * 1000).toLocaleString("en-GB", { dateStyle: "long", timeStyle: "medium" });
   const [ctxDate, ctxLocation, ctxDescription] = record.context.split("|").map((s) => s.trim());
 
@@ -32,8 +32,8 @@ function VerifiedCard({ data }) {
         {ctxDate        && <InfoRow label="Event Date" value={ctxDate} />}
         {ctxLocation    && <InfoRow label="Location" value={ctxLocation} />}
         {ctxDescription && <InfoRow label="Original Description" value={ctxDescription} className="sm:col-span-2" />}
-        <InfoRow label="Uploaded Image pHash" value={phash} mono className="sm:col-span-2" />
-        <InfoRow label="Registered pHash" value={record.phash} mono className="sm:col-span-2" />
+        <InfoRow label="Uploaded File dualHash" value={dualHash} mono className="sm:col-span-2" />
+        <InfoRow label="Registered dualHash" value={record.dualHash} mono className="sm:col-span-2" />
       </div>
 
       <p className="mt-5 text-xs text-emerald-700 border-t border-emerald-800/50 pt-4">
@@ -52,8 +52,8 @@ function InfoRow({ label, value, mono = false, className = "" }) {
   );
 }
 
-/** @param {{ phash: string }} props */
-function DisinformationWarning({ phash }) {
+/** @param {{ dualHash: string }} props */
+function DisinformationWarning({ dualHash }) {
   return (
     <div className="animate-fade-in-up mt-8 rounded-2xl border-2 border-red-600/70 bg-red-950/40 p-6 shadow-lg shadow-red-900/30">
       <div className="flex items-center gap-4 mb-5">
@@ -79,7 +79,7 @@ function DisinformationWarning({ phash }) {
 
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">pHash calculat</span>
-        <span className="font-mono text-sm text-red-400 break-all">{phash}</span>
+        <span className="font-mono text-sm text-red-400 break-all">{dualHash}</span>
       </div>
 
       <p className="mt-4 text-xs text-red-800">
@@ -110,22 +110,22 @@ export default function VerifyPortal() {
 
     // send the suspicious image to the backend for phash extraction + registry lookup
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("file", file);
 
-    console.log("[verify] sending image for verification:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
+    console.log("[verify] sending file for verification:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
 
     try {
       // backend computes phash and compares hamming distance against all on-chain records
       const { data } = await axios.post("/api/verify", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
-      console.log("[verify] phash computed:", data.phash);
+      console.log("[verify] dualHash computed:", data.dualHash);
       console.log("[verify] verified:", data.verified, "| distance:", data.distance);
       if (data.record) {
         console.log("[verify] matched record:", data.record);
       }
 
       // show result card based on whether a match was found
-      setResult(data.verified ? { type: "verified", data } : { type: "unverified", phash: data.phash });
+      setResult(data.verified ? { type: "verified", data } : { type: "unverified", dualHash: data.dualHash });
     } catch (err) {
       console.error("[verify] error:", err.response?.data?.error ?? err.message);
       setResult({ type: "error", message: err.response?.data?.error ?? err.message });
@@ -194,7 +194,7 @@ export default function VerifyPortal() {
       )}
 
       {result?.type === "verified"   && <VerifiedCard data={result.data} />}
-      {result?.type === "unverified" && <DisinformationWarning phash={result.phash} />}
+      {result?.type === "unverified" && <DisinformationWarning dualHash={result.dualHash} />}
       {result?.type === "error"      && (
         <div className="animate-fade-in-up mt-8 rounded-xl border border-red-700/50 bg-red-950/30 p-5 flex gap-3">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

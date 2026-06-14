@@ -19,7 +19,7 @@ function CertificateCard({ data }) {
         </div>
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Perceptual Hash (pHash)" value={data.phash} mono />
+        <Field label="Dual Hash (pHash + dHash)" value={data.dualHash} mono />
         <Field label="Author Wallet" value={data.author} mono />
         <Field label="Anchored At" value={date} />
         <Field label="Block Number" value={`#${data.blockNumber.toLocaleString()}`} mono />
@@ -58,7 +58,7 @@ function DuplicateCard({ existing }) {
         </div>
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-        <div><dt className="text-xs text-slate-500 uppercase tracking-wider mb-1">Existing pHash</dt><dd className="font-mono text-amber-300 break-all">{existing.phash}</dd></div>
+        <div><dt className="text-xs text-slate-500 uppercase tracking-wider mb-1">Existing dualHash</dt><dd className="font-mono text-amber-300 break-all">{existing.dualHash}</dd></div>
         <div><dt className="text-xs text-slate-500 uppercase tracking-wider mb-1">Original Author</dt><dd className="font-mono text-slate-300 break-all">{existing.author}</dd></div>
         <div><dt className="text-xs text-slate-500 uppercase tracking-wider mb-1">Anchored At</dt><dd className="text-slate-300">{date}</dd></div>
         <div><dt className="text-xs text-slate-500 uppercase tracking-wider mb-1">Context</dt><dd className="text-slate-300">{existing.context}</dd></div>
@@ -108,18 +108,18 @@ export default function JournalistPortal() {
 
     // build the multipart payload — image file + combined context string
     const formData = new FormData();
-    formData.append("image",   file);
+    formData.append("file",    file);
     formData.append("context", `${form.date} | ${form.location} | ${form.description}`);
     if (form.wallet.trim()) formData.append("author", form.wallet.trim());
 
-    console.log("[anchor] submitting image:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
+    console.log("[anchor] submitting file:", file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
     console.log("[anchor] context:", `${form.date} | ${form.location} | ${form.description}`);
 
     try {
       // POST to backend — python computes phash, then contract is called
       const { data } = await axios.post("/api/anchor", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
-      console.log("[anchor] success! phash:", data.phash);
+      console.log("[anchor] success! dualHash:", data.dualHash);
       console.log("[anchor] tx hash:", data.txHash, "| block:", data.blockNumber);
 
       setResult({ type: "success", data });
@@ -127,7 +127,7 @@ export default function JournalistPortal() {
       const resp = err.response?.data;
       if (resp?.duplicate) {
         // image already registered — show existing record
-        console.warn("[anchor] duplicate detected:", resp.existing?.phash);
+        console.warn("[anchor] duplicate detected:", resp.existing?.dualHash);
         setResult({ type: "duplicate", data: resp.existing });
       } else {
         console.error("[anchor] error:", resp?.error ?? err.message);

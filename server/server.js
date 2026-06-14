@@ -46,6 +46,7 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
 
+
 function computePHash(imagePath) {
   return new Promise((resolve, reject) => {
     const scriptDir  = path.resolve(__dirname, "..");
@@ -66,7 +67,9 @@ function computePHash(imagePath) {
 
     child.on("close", (code) => {
       if (code !== 0) return reject(new Error(`Python exited ${code}.\n${stderr.trim()}`));
-      const phash = stdout.trim();
+      // phash_generator prints debug lines; the actual hash is always the last line
+      const lines = stdout.trim().split("\n").filter(l => l.length > 0);
+      const phash = lines[lines.length - 1].trim();
       if (!phash) return reject(new Error("Python returned an empty pHash."));
       resolve(phash);
     });
@@ -75,32 +78,44 @@ function computePHash(imagePath) {
   });
 }
 
-function hammingDistance(hexA, hexB) {
-  const partsA = hexA.split(":");
-  const partsB = hexB.split(":");
-
-  if (partsA.length === 1 && partsB.length === 1) {
-    if (hexA.length !== hexB.length) return Infinity;
-    let dist = 0;
-    for (let i = 0; i < hexA.length; i++) {
-      const xor = parseInt(hexA[i], 16) ^ parseInt(hexB[i], 16);
-      dist += xor.toString(2).split("").filter((b) => b === "1").length;
-    }
-    return dist;
+// compute hamming distance for a single hex hash pair
+function singleHamming(hexA, hexB) {
+  if (hexA.length !== hexB.length) return Infinity;
+  let dist = 0;
+  for (let i = 0; i < hexA.length; i++) {
+    const xor = parseInt(hexA[i], 16) ^ parseInt(hexB[i], 16);
+    dist += xor.toString(2).split("").filter((b) => b === "1").length;
   }
+  return dist;
+}
 
-  if (partsA.length !== partsB.length) return Infinity;
+// compute dual hamming distance
+// format: "phash|dhash" per page, pages separated by ":"
+// returns max(phash_dist, dhash_dist) across all pages
+function hammingDistance(hashA, hashB) {
+  const pagesA = hashA.split(":");
+  const pagesB = hashB.split(":");
+
+  if (pagesA.length !== pagesB.length) return Infinity;
 
   let maxDist = 0;
-  for (let p = 0; p < partsA.length; p++) {
-    const pa = partsA[p];
-    const pb = partsB[p];
-    if (pa.length !== pb.length) return Infinity;
-    let pageDist = 0;
-    for (let i = 0; i < pa.length; i++) {
-      const xor = parseInt(pa[i], 16) ^ parseInt(pb[i], 16);
-      pageDist += xor.toString(2).split("").filter((b) => b === "1").length;
+  for (let p = 0; p < pagesA.length; p++) {
+    const partsA = pagesA[p].split("|");
+    const partsB = pagesB[p].split("|");
+
+    let pageDist;
+    if (partsA.length === 2 && partsB.length === 2) {
+      // dual hash: max of phash distance and dhash distance
+      const phDist = singleHamming(partsA[0], partsB[0]);
+      const dhDist = singleHamming(partsA[1], partsB[1]);
+      pageDist = Math.max(phDist, dhDist);
+    } else if (partsA.length === 1 && partsB.length === 1) {
+      // legacy single hash
+      pageDist = singleHamming(partsA[0], partsB[0]);
+    } else {
+      return Infinity;
     }
+
     if (pageDist > maxDist) maxDist = pageDist;
   }
   return maxDist;
@@ -112,9 +127,9 @@ function cleanup(filePath) {
   });
 }
 
-app.post("/api/anchor", upload.single("image"), async (req, res) => {
+app.post("/api/anchor", upload.single("file"), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, error: "No image file provided." });
+    return res.status(400).json({ success: false, error: "No file provided." });
   }
 
   const { context } = req.body;
@@ -132,13 +147,13 @@ app.post("/api/anchor", upload.single("image"), async (req, res) => {
     if (alreadyAnchored) {
       cleanup(req.file.path);
       const allRecords = await contract.getAllRecords();
-      const existing = allRecords.find((r) => r.phash === phash);
+      const existing = allRecords.find((r) => r.dualHash === phash);
       return res.status(409).json({
         success  : false,
         duplicate: true,
-        error    : "This image (or a visually identical one) is already registered.",
+        error    : "This file (or a visually identical one) is already registered.",
         existing : existing
-          ? { phash: existing.phash, author: existing.author, timestamp: Number(existing.timestamp), context: existing.context }
+          ? { dualHash: existing.dualHash, author: existing.author, timestamp: Number(existing.timestamp), context: existing.context }
           : null,
       });
     }
@@ -149,7 +164,7 @@ app.post("/api/anchor", upload.single("image"), async (req, res) => {
     cleanup(req.file.path);
     return res.status(201).json({
       success    : true,
-      phash,
+      dualHash   : phash,
       author     : signer.address,
       timestamp  : Math.floor(Date.now() / 1000),
       context    : context.trim(),
@@ -164,9 +179,9 @@ app.post("/api/anchor", upload.single("image"), async (req, res) => {
   }
 });
 
-app.post("/api/verify", upload.single("image"), async (req, res) => {
+app.post("/api/verify", upload.single("file"), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, error: "No image file provided." });
+    return res.status(400).json({ success: false, error: "No file provided." });
   }
 
   try {
@@ -179,11 +194,11 @@ app.post("/api/verify", upload.single("image"), async (req, res) => {
     let bestDist  = Infinity;
 
     for (const record of allRecords) {
-      const dist = hammingDistance(phash, record.phash);
+      const dist = hammingDistance(phash, record.dualHash);
       if (dist <= 10 && dist < bestDist) {
         bestDist  = dist;
         bestMatch = {
-          phash    : record.phash,
+          dualHash : record.dualHash,
           author   : record.author,
           timestamp: Number(record.timestamp),
           context  : record.context,
@@ -197,13 +212,13 @@ app.post("/api/verify", upload.single("image"), async (req, res) => {
       return res.status(200).json({
         success : true,
         verified: true,
-        phash,
+        dualHash: phash,
         distance: bestDist,
         record  : bestMatch,
       });
     }
 
-    return res.status(200).json({ success: true, verified: false, phash, distance: null, record: null });
+    return res.status(200).json({ success: true, verified: false, dualHash: phash, distance: null, record: null });
   } catch (err) {
     console.error("[verify]", err.message);
     cleanup(req.file.path);

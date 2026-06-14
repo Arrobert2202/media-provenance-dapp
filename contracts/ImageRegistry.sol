@@ -6,7 +6,7 @@ contract ImageRegistry {
 
     // each record holds the hash, who submitted it, when, and a text description
     struct ImageRecord {
-        string phash;
+        string dualHash;
         address author;
         uint256 timestamp;
         string context;
@@ -21,7 +21,7 @@ contract ImageRegistry {
     // fired every time a new image is successfully anchored
     event ImageAnchored(
         uint256 indexed recordIndex,
-        string phash,
+        string dualHash,
         address indexed author,
         uint256 timestamp,
         string context
@@ -29,18 +29,18 @@ contract ImageRegistry {
 
     // store a new image hash on-chain with its context metadata
     function anchorImage(
-        string memory _phash,
+        string memory _dualHash,
         string memory _context
     ) external {
-        require(bytes(_phash).length > 0, "pHash cannot be empty");
-        require(!hasBeenAnchored[_phash], "pHash already anchored");
+        require(bytes(_dualHash).length > 0, "dualHash cannot be empty");
+        require(!hasBeenAnchored[_dualHash], "dualHash already anchored");
 
         // mark as anchored so duplicates are rejected
-        hasBeenAnchored[_phash] = true;
+        hasBeenAnchored[_dualHash] = true;
 
         // append the new record to the array
         records.push(ImageRecord({
-            phash: _phash,
+            dualHash: _dualHash,
             author: msg.sender,
             timestamp: block.timestamp,
             context: _context
@@ -49,7 +49,7 @@ contract ImageRegistry {
         // emit event so off-chain clients can index it
         emit ImageAnchored(
             records.length - 1,
-            _phash,
+            _dualHash,
             msg.sender,
             block.timestamp,
             _context

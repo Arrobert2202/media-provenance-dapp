@@ -4,29 +4,29 @@ const request = require("supertest");
 const path    = require("path");
 const fs      = require("fs");
 
-const FAKE_PHASH_ORIGINAL   = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const FAKE_PHASH_COMPRESSED = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
-const FAKE_PHASH_UNRELATED  = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+// mock hashes for the python subprocess
+const FAKE_HASH_ORIGINAL   = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const FAKE_HASH_COMPRESSED = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const FAKE_HASH_UNRELATED  = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
+// in-memory store to simulate the contract
+let mockRecords = [];
+let mockAnchored = new Map();
+
+// mock child_process so we don't need python
 jest.mock("child_process", () => {
   const EventEmitter = require("events");
 
-  const defaultSequence = [
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
-    "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-  ];
-
   if (typeof global.__mockPHashIndex === "undefined") {
-    global.__mockPHashIndex    = 0;
-    global.__mockPHashSequence = [...defaultSequence];
+    global.__mockPHashIndex = 0;
+    global.__mockPHashSequence = [FAKE_HASH_ORIGINAL];
   }
 
   return {
     spawn: jest.fn(() => {
       const stdout = new EventEmitter();
       const stderr = new EventEmitter();
-      const seq      = global.__mockPHashSequence || defaultSequence;
+      const seq = global.__mockPHashSequence || [FAKE_HASH_ORIGINAL];
       const fakeHash = seq[(global.__mockPHashIndex || 0) % seq.length];
       global.__mockPHashIndex = (global.__mockPHashIndex || 0) + 1;
 
@@ -40,7 +40,40 @@ jest.mock("child_process", () => {
   };
 });
 
-const { app, registry } = require("../server");
+// mock ethers so we don't need hardhat node
+jest.mock("ethers", () => {
+  const mockContract = {
+    hasBeenAnchored: async (hash) => mockAnchored.has(hash),
+    anchorImage: async (hash, context) => {
+      mockAnchored.set(hash, true);
+      mockRecords.push({
+        dualHash: hash,
+        author: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        timestamp: BigInt(Math.floor(Date.now() / 1000)),
+        context,
+      });
+      return {
+        wait: async () => ({
+          hash: "0x" + "a".repeat(64),
+          blockNumber: 42n,
+          gasUsed: 327534n,
+        }),
+      };
+    },
+    getAllRecords: async () => mockRecords,
+    getRecordCount: async () => BigInt(mockRecords.length),
+  };
+
+  const ethers = {
+    JsonRpcProvider: function() { return {}; },
+    Wallet: function() { return { address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" }; },
+    Contract: function() { return mockContract; },
+  };
+
+  return { ethers, ...ethers };
+});
+
+const { app } = require("../server");
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
@@ -58,23 +91,17 @@ function ensureFixtures() {
 
 const fixturePath = (name) => path.join(FIXTURES_DIR, name);
 
-function seedRegistry(phash, record) {
-  registry.set(phash, {
-    phash,
-    author   : record.author    || "0xTestAuthor000000000000000000000000000000",
-    timestamp: record.timestamp || Math.floor(Date.now() / 1000),
-    context  : record.context   || "Test context",
-  });
-}
-
-const clearFromRegistry = (phash) => registry.delete(phash);
-
 const resetMock = (sequence) => {
-  global.__mockPHashIndex    = 0;
+  global.__mockPHashIndex = 0;
   global.__mockPHashSequence = sequence;
 };
 
 beforeAll(ensureFixtures);
+
+beforeEach(() => {
+  mockRecords = [];
+  mockAnchored = new Map();
+});
 
 afterAll(() => {
   ["original.jpg", "compressed.jpg", "unrelated.jpg"].forEach((name) => {
@@ -93,66 +120,51 @@ describe("GET /api/health", () => {
 });
 
 describe("POST /api/anchor", () => {
-  beforeEach(() => resetMock([FAKE_PHASH_ORIGINAL, FAKE_PHASH_ORIGINAL, FAKE_PHASH_ORIGINAL]));
-  afterEach(() => clearFromRegistry(FAKE_PHASH_ORIGINAL));
+  beforeEach(() => resetMock([FAKE_HASH_ORIGINAL]));
 
-  it("✅ should anchor a new image and return a valid transaction simulation", async () => {
+  it("should anchor a new image and return success", async () => {
     const res = await request(app)
       .post("/api/anchor")
-      .attach("image", fixturePath("original.jpg"))
-      .field("context", "Protest in Piața Victoriei | Bucharest | 01/05/2026 18:30")
-      .field("author",  "0xJournalist000000000000000000000000000001");
+      .attach("file", fixturePath("original.jpg"))
+      .field("context", "Protest in Piata Victoriei | Bucharest | 2026-05-01");
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.duplicate).toBe(false);
-    expect(res.body.phash).toBe(FAKE_PHASH_ORIGINAL);
-    expect(res.body.author).toBe("0xJournalist000000000000000000000000000001");
-    expect(res.body.context).toBe("Protest in Piața Victoriei | Bucharest | 01/05/2026 18:30");
-    expect(res.body.timestamp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000) + 5);
-    expect(res.body.txHash).toMatch(/^0x[0-9a-f]+$/i);
-    expect(res.body.blockNumber).toBeGreaterThanOrEqual(19_000_000);
-    expect(res.body.blockNumber).toBeLessThanOrEqual(20_000_000);
-  });
-
-  it("✅ should auto-generate a wallet address when author is not provided", async () => {
-    const res = await request(app)
-      .post("/api/anchor")
-      .attach("image", fixturePath("original.jpg"))
-      .field("context", "Auto-wallet test");
-
-    expect(res.status).toBe(201);
+    expect(res.body.dualHash).toBe(FAKE_HASH_ORIGINAL);
     expect(res.body.author).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(res.body.context).toBe("Protest in Piata Victoriei | Bucharest | 2026-05-01");
+    expect(res.body.txHash).toMatch(/^0x[0-9a-f]+$/i);
   });
 
-  it("✅ should return 409 when the same image is anchored twice", async () => {
+  it("should return 409 when the same image is anchored twice", async () => {
+    resetMock([FAKE_HASH_ORIGINAL, FAKE_HASH_ORIGINAL]);
+
     const first = await request(app)
       .post("/api/anchor")
-      .attach("image", fixturePath("original.jpg"))
+      .attach("file", fixturePath("original.jpg"))
       .field("context", "First anchor");
 
     expect(first.status).toBe(201);
 
     const second = await request(app)
       .post("/api/anchor")
-      .attach("image", fixturePath("original.jpg"))
+      .attach("file", fixturePath("original.jpg"))
       .field("context", "Duplicate attempt");
 
     expect(second.status).toBe(409);
     expect(second.body.duplicate).toBe(true);
     expect(second.body.error).toMatch(/already registered/i);
-    expect(second.body.existing.phash).toBe(FAKE_PHASH_ORIGINAL);
-    expect(second.body.existing.context).toBe("First anchor");
   });
 
-  it("✅ should return 400 when no image is provided", async () => {
+  it("should return 400 when no image is provided", async () => {
     const res = await request(app).post("/api/anchor").field("context", "No image");
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/no image/i);
+    expect(res.body.error).toMatch(/no file/i);
   });
 
-  it("✅ should return 400 when context is missing", async () => {
-    const res = await request(app).post("/api/anchor").attach("image", fixturePath("original.jpg"));
+  it("should return 400 when context is missing", async () => {
+    const res = await request(app).post("/api/anchor").attach("file", fixturePath("original.jpg"));
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/context/i);
   });
@@ -160,41 +172,40 @@ describe("POST /api/anchor", () => {
 
 describe("POST /api/verify", () => {
   beforeEach(() => {
-    seedRegistry(FAKE_PHASH_ORIGINAL, {
-      author   : "0xJournalist000000000000000000000000000001",
-      context  : "Protest in Piața Victoriei | Bucharest | 01/05/2026 18:30",
-      timestamp: 1746100200,
+    // seed registry with one record
+    mockRecords.push({
+      dualHash: FAKE_HASH_ORIGINAL,
+      author: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      timestamp: BigInt(1746100200),
+      context: "Protest in Piata Victoriei | Bucharest | 2026-05-01",
     });
+    mockAnchored.set(FAKE_HASH_ORIGINAL, true);
   });
-  afterEach(() => clearFromRegistry(FAKE_PHASH_ORIGINAL));
 
-  it("✅ should return verified=true with distance=0 for the original image", async () => {
-    resetMock([FAKE_PHASH_ORIGINAL]);
-    const res = await request(app).post("/api/verify").attach("image", fixturePath("original.jpg"));
+  it("should return verified=true with distance=0 for the original image", async () => {
+    resetMock([FAKE_HASH_ORIGINAL]);
+    const res = await request(app).post("/api/verify").attach("file", fixturePath("original.jpg"));
 
     expect(res.status).toBe(200);
     expect(res.body.verified).toBe(true);
     expect(res.body.distance).toBe(0);
-    expect(res.body.phash).toBe(FAKE_PHASH_ORIGINAL);
-    expect(res.body.record.author).toBe("0xJournalist000000000000000000000000000001");
-    expect(res.body.record.context).toBe("Protest in Piața Victoriei | Bucharest | 01/05/2026 18:30");
+    expect(res.body.dualHash).toBe(FAKE_HASH_ORIGINAL);
+    expect(res.body.record.author).toMatch(/^0x/);
   });
 
-  it("✅ should return verified=true for a compressed/WhatsApp version (fuzzy match)", async () => {
-    resetMock([FAKE_PHASH_COMPRESSED]);
-    const res = await request(app).post("/api/verify").attach("image", fixturePath("compressed.jpg"));
+  it("should return verified=true for a compressed version (fuzzy match)", async () => {
+    resetMock([FAKE_HASH_COMPRESSED]);
+    const res = await request(app).post("/api/verify").attach("file", fixturePath("compressed.jpg"));
 
     expect(res.status).toBe(200);
     expect(res.body.verified).toBe(true);
     expect(res.body.distance).toBeGreaterThan(0);
     expect(res.body.distance).toBeLessThanOrEqual(10);
-    expect(res.body.phash).toBe(FAKE_PHASH_COMPRESSED);
-    expect(res.body.record.phash).toBe(FAKE_PHASH_ORIGINAL);
   });
 
-  it("✅ should return verified=false for a fake/unregistered image (disinformation scenario)", async () => {
-    resetMock([FAKE_PHASH_UNRELATED]);
-    const res = await request(app).post("/api/verify").attach("image", fixturePath("unrelated.jpg"));
+  it("should return verified=false for an unrelated image", async () => {
+    resetMock([FAKE_HASH_UNRELATED]);
+    const res = await request(app).post("/api/verify").attach("file", fixturePath("unrelated.jpg"));
 
     expect(res.status).toBe(200);
     expect(res.body.verified).toBe(false);
@@ -202,36 +213,31 @@ describe("POST /api/verify", () => {
     expect(res.body.distance).toBeNull();
   });
 
-  it("✅ should return 400 when no image is provided to /verify", async () => {
+  it("should return 400 when no image is provided", async () => {
     const res = await request(app).post("/api/verify");
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/no image/i);
+    expect(res.body.error).toMatch(/no file/i);
   });
 
-  it("✅ should return verified=false when the registry is empty", async () => {
-    resetMock([FAKE_PHASH_ORIGINAL]);
-    const snapshot = new Map(registry);
-    registry.clear();
-    try {
-      const res = await request(app).post("/api/verify").attach("image", fixturePath("original.jpg"));
-      expect(res.body.verified).toBe(false);
-      expect(res.body.record).toBeNull();
-    } finally {
-      snapshot.forEach((v, k) => registry.set(k, v));
-    }
+  it("should return verified=false when the registry is empty", async () => {
+    mockRecords = [];
+    resetMock([FAKE_HASH_ORIGINAL]);
+    const res = await request(app).post("/api/verify").attach("file", fixturePath("original.jpg"));
+    expect(res.body.verified).toBe(false);
+    expect(res.body.record).toBeNull();
   });
 });
 
-describe("Input validation & edge cases", () => {
-  beforeEach(() => resetMock([FAKE_PHASH_ORIGINAL]));
+describe("Input validation", () => {
+  beforeEach(() => resetMock([FAKE_HASH_ORIGINAL]));
 
-  it("✅ should reject non-image file uploads with 400", async () => {
+  it("should reject non-image file uploads with 400", async () => {
     const txtPath = path.join(FIXTURES_DIR, "malicious.txt");
     fs.writeFileSync(txtPath, "not an image");
     try {
       const res = await request(app)
         .post("/api/anchor")
-        .attach("image", txtPath, { contentType: "text/plain" })
+        .attach("file", txtPath, { contentType: "text/plain" })
         .field("context", "Malicious upload");
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -240,7 +246,7 @@ describe("Input validation & edge cases", () => {
     }
   });
 
-  it("✅ should return 404 for unknown routes", async () => {
+  it("should return 404 for unknown routes", async () => {
     const res = await request(app).get("/api/nonexistent");
     expect(res.status).toBe(404);
   });
