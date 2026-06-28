@@ -52,6 +52,47 @@ function InfoRow({ label, value, mono = false, className = "" }) {
   );
 }
 
+/** @param {{ dualHash: string, distance: number, record: object }} props */
+function UncertainCard({ data }) {
+  const { record, dualHash, distance } = data;
+  const anchoredDate = new Date(record.timestamp * 1000).toLocaleString("en-GB", { dateStyle: "long", timeStyle: "medium" });
+  const [ctxDate, ctxLocation, ctxDescription] = record.context.split("|").map((s) => s.trim());
+
+  return (
+    <div className="animate-fade-in-up mt-8 rounded-2xl border-2 border-amber-600/50 bg-amber-950/30 p-6 shadow-lg shadow-amber-900/20">
+      <div className="flex items-start gap-4 mb-6">
+        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-600/20 border border-amber-600/40 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-amber-300">Uncertain Match</h2>
+          <p className="text-sm text-amber-500 mt-0.5">
+            A similar record was found (Hamming distance: {distance} bits), but the distance exceeds the confidence threshold. The image may have been subtly manipulated or heavily compressed.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-amber-900/20 rounded-xl p-4 border border-amber-800/40 mb-4">
+        <p className="text-sm text-amber-300 leading-relaxed">
+          The closest matching record is shown below, but verification is <strong>not confirmed</strong>. Exercise caution and verify the source independently.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoRow label="Closest Author" value={record.author} mono />
+        <InfoRow label="Anchored At" value={anchoredDate} />
+        {ctxDate        && <InfoRow label="Event Date" value={ctxDate} />}
+        {ctxLocation    && <InfoRow label="Location" value={ctxLocation} />}
+        {ctxDescription && <InfoRow label="Original Description" value={ctxDescription} className="sm:col-span-2" />}
+        <InfoRow label="Uploaded File dualHash" value={dualHash} mono className="sm:col-span-2" />
+        <InfoRow label="Closest dualHash" value={record.dualHash} mono className="sm:col-span-2" />
+      </div>
+    </div>
+  );
+}
+
 /** @param {{ dualHash: string }} props */
 function DisinformationWarning({ dualHash }) {
   return (
@@ -124,8 +165,14 @@ export default function VerifyPortal() {
         console.log("[verify] matched record:", data.record);
       }
 
-      // show result card based on whether a match was found
-      setResult(data.verified ? { type: "verified", data } : { type: "unverified", dualHash: data.dualHash });
+      // show result card based on verdict
+      if (data.verdict === "match") {
+        setResult({ type: "verified", data });
+      } else if (data.verdict === "uncertain") {
+        setResult({ type: "uncertain", data });
+      } else {
+        setResult({ type: "unverified", dualHash: data.dualHash });
+      }
     } catch (err) {
       console.error("[verify] error:", err.response?.data?.error ?? err.message);
       setResult({ type: "error", message: err.response?.data?.error ?? err.message });
@@ -194,6 +241,7 @@ export default function VerifyPortal() {
       )}
 
       {result?.type === "verified"   && <VerifiedCard data={result.data} />}
+      {result?.type === "uncertain"  && <UncertainCard data={result.data} />}
       {result?.type === "unverified" && <DisinformationWarning dualHash={result.dualHash} />}
       {result?.type === "error"      && (
         <div className="animate-fade-in-up mt-8 rounded-xl border border-red-700/50 bg-red-950/30 p-5 flex gap-3">

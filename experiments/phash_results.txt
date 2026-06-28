@@ -1,0 +1,209 @@
+======================================================================
+  EXPERIMENT 4.2: Fuzzy Matching Validation
+======================================================================
+
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481fe81df81178fc78fc2cf82ce02c80ecafecafeea88ea08c2a8|588049b480018280800000008000800060000000000000000000000000000412
+  Original image: original.png (2940x1912)
+  Original dual hash: fe13fd13815481fe81df81178fc78fc2cf82ce02...
+  Threshold: 10 bits out of 256
+
+----------------------------------------------------------------------
+  TABLE 1: Compression Resilience
+----------------------------------------------------------------------
+  Transformation                             Distance      Verdict
+  ──────────────────────────────────────── ────────── ────────────
+[hamming] dual distance is 0
+  Original vs. Original (self-test)                 0        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815681fe81df81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|5884c1a480018280900000008000800060000000000000000000000000000402
+[hamming] dual distance is 6
+  Original vs. WhatsApp compressed                  6        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481ff81d781178fc78fc2cf82ce02c88ecaeecafeea88ea08c2a8|588049b480018280900000008000800060000000000000000000000000000412
+[hamming] dual distance is 4
+  Simulated JPEG quality=75                         4        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481ff81df83178fc78fc2ce82ce02c88ecaeecaeeea88ea08c2a8|588049b080018280800000008000800060000000000000000000000000000400
+[hamming] dual distance is 6
+  Simulated JPEG quality=40                         6        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fc13817681fe815783178fd78fc2ce82ce02c80ecafecafeea88ea08c2a8|508449b000018280900000008000800060000000000000000000000000000c80
+[hamming] dual distance is 9
+  Simulated JPEG quality=20                         9        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe03fd13815481ff81d781178fc78fc2cf82ce02c88ecaeecafeea88ee08c2a8|5880419080418280800000008000800060000000000000000000000000000440
+[hamming] dual distance is 7
+  Simulated JPEG quality=10                         7        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe17fc12c15481fe81df81878fc78fc2cf82ce02c80ec2feeafeea88ea08c2a8|5a0441b000018280100000008000800060000000000000000000000000000480
+[hamming] dual distance is 11
+  Simulated JPEG quality=5                         11    UNCERTAIN
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ef87ba51b9e181fb9cfec70ece18f80db834a3ff85fc911ec700f402e400c447|482b2503b00a320a900298015820180058401a10188018801880304050003820
+[hamming] dual distance is 124
+  Unrelated image (different.png)                 124     NO MATCH
+
+----------------------------------------------------------------------
+  TABLE 2: Resize Transformations
+----------------------------------------------------------------------
+  Transformation                             Distance      Verdict
+  ──────────────────────────────────────── ────────── ────────────
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481ff81d781178fc78fc2cf82ce02c88ecaeecafeea88ea08c2a8|588049b000018280800000008000800060000000000000000000000000000412
+[hamming] dual distance is 4
+  Resize 75% (2205x1434)                            4        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481ff81df81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|588049b080018280900000008000800060000000000000000000000000000412
+[hamming] dual distance is 2
+  Resize 50% (1470x956)                             2        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481fe81df81178fc78fc2ce82ce02c88ecafecafeea88ea08c2a8|588049a080018280900000008000800060000000000000000000000000000402
+[hamming] dual distance is 4
+  Resize 25% (735x478)                              4        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481fe81df81178fc78fc2cf82ce02c80fcaeecafeea88ea08c2a8|508049a080018280800000008000800060000000000000000000000000000400
+[hamming] dual distance is 5
+  Resize 10% (294x191)                              5        MATCH
+
+----------------------------------------------------------------------
+  TABLE 3: Visual Filters and Manipulations
+----------------------------------------------------------------------
+  Transformation                             Distance      Verdict
+  ──────────────────────────────────────── ────────── ────────────
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fc13815681ff81d781178fc78fc2cf82ce02c80ecafecafeea88ea08c2a8|588049a080018280800000008000800060000000000000000000000000000412
+[hamming] dual distance is 4
+  Gaussian Blur (radius=3)                          4        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd17815481ff815781178fd78fc2ce82ce02c88ecaeecafeea88ea08c2a8|5880419080018480800000008000800060000000000000000000000000000880
+[hamming] dual distance is 10
+  Sharpen filter                                   10        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe17fd13815281ff815781178fc78fc2ce82ce02ca0ecaeecaeeee88ee08c2a8|5880c1b080418300900000008000800020008000000000000000000050000d00
+[hamming] dual distance is 15
+  Brightness +30%                                  15    UNCERTAIN
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815681ff815f81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|5884499400018400800000008000800060000000000000000000000000000842
+[hamming] dual distance is 10
+  Brightness -30%                                  10        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fc13fd13815081ff81d781178fc78fc2ce82ce02ca8ecaeecaeeee8aee08c2a8|5984c1b080218200900000008000800060008000000000000000000040000d02
+[hamming] dual distance is 13
+  Contrast +50%                                    13    UNCERTAIN
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481fe81df81178fc78fc2cf82ce02c80ecafecafeea88ea08c2a8|588049b480018280800000008000800060000000000000000000000000000412
+[hamming] dual distance is 0
+  Grayscale conversion                              0        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ab42a842c400d4aad40ad002da82da969ad79b529d5a9faa9babbbddbb5d97a9|9e25d06c016e800e0006000f0006000600010000000000000000000000009001
+[hamming] dual distance is 110
+  Horizontal flip (mirror)                        110     NO MATCH
+
+----------------------------------------------------------------------
+  TABLE 4: Rotation (known limitation)
+----------------------------------------------------------------------
+  Transformation                             Distance      Verdict
+  ──────────────────────────────────────── ────────── ────────────
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ffbfe00097ffc1d08557d5579fd5dfc19e41dc05885fc0fc8af8f4008200427c|1001018548450005100500054005000540054001400140014001508140017fff
+[hamming] dual distance is 76
+  Rotation 1°                                      76     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ffbfe0009555d5558555d5559755dd458545f455807d74fc82547004815573fd|00010185498500051005000540054005400540054005400540014881401f7fff
+[hamming] dual distance is 106
+  Rotation 2°                                     106     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ffaac0009555d5559555d555955475559554305595543d5195553d55d7d53555|0001000101814015048510054005400540054005400540054169500307ff7fe0
+[hamming] dual distance is 144
+  Rotation 5°                                     144     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: feaac00f9550d5ff950a3557956a357ed57a354aefc2b502e57a500ae55a080a|06034003000b011b408b480b400348054805000520052071270720ff2fe03e07
+[hamming] dual distance is 116
+  Rotation 10°                                    116     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: eabaccb39594ad73d99a50a2819ebb53ae141133546a73d38a252a8fcf765154|0134023a045d08ae1117220b4405800b0016486d20db15368a6c44d023a01340
+[hamming] dual distance is 114
+  Rotation 45°                                    114     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ffff3f00c0061fffc3fe383183df807f139dc0e6101901e6103f01c6dff8008f|00000000000000000000000000000000000000001000100049004a0042005200
+[hamming] dual distance is 114
+  Rotation 90°                                    114     NO MATCH
+
+----------------------------------------------------------------------
+  TABLE 5: Center Crop (known limitation)
+----------------------------------------------------------------------
+  Transformation                             Distance      Verdict
+  ──────────────────────────────────────── ────────── ────────────
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ff03ff139135817c8117811781f78ff08fc0df80cc83c8efc8eaec88eea8c8e8|3590c9e000011480000000009000800060000000000000000000000000000000
+[hamming] dual distance is 46
+  Center crop 95% (2793x1816)                      46     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: ff00ff11b13f803f80179003813383ff9ff29fe09d80800388f7ffe2ffc0c8f0|919249c000001000000090009000000040000000000000000000000000000000
+[hamming] dual distance is 92
+  Center crop 90% (2646x1720)                      92     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fffffffffe0fe001e000ff00e000c003801fefffcfff000000001fc0ffe03ff0|9900000024004000000000002000000040000000000000000000000000000000
+[hamming] dual distance is 148
+  Center crop 80% (2352x1529)                     148     NO MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fffffffffe00fc00ff00ffe7ff00fc00fc00fe00fc0080000000f000ffc0fff8|0000400000000000000000004000000000000000000000000000000000000000
+[hamming] dual distance is 128
+  Center crop 70% (2058x1338)                     128     NO MATCH
+
+======================================================================
+  SUMMARY
+======================================================================
+
+  The dual-hash mechanism (pHash + dHash) correctly identifies the original
+  image after: JPEG compression (quality 10-75), WhatsApp recompression,
+  resize down to 10%, Gaussian blur, sharpening, and grayscale conversion.
+
+  Known limitations (distance > threshold):
+  - Rotation (even 1°): pHash/dHash are not rotation-invariant
+  - Significant crop: changes the frequency distribution
+  - Horizontal flip: reverses the gradient direction
+  - Extreme brightness/contrast adjustments (>30%)
+
+  These limitations are acceptable for the journalistic use case, where
+  the primary threat is social media recompression, not geometric transforms.
+
+
+======================================================================
+  EXPERIMENT 4.2b: PDF Multi-Page Hashing
+======================================================================
+
+  Created test PDF: test_document.pdf (2 pages)
+
+[phash] extracting dual hash (hash_size=16)...
+[phash] pdf dual hash (2 pages): fe13fd13815481ff81df81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|588041a000018280900000008000800060000000000000000000000000000402:ef87ba51b9e181fb9cfec70ece18f80db830a3ff85fd911ec700f402e400c447|492b2503b00a320a900298015820180058401810188018801880104050001820
+----------------------------------------------------------------------
+  TABLE 6: PDF Experiments
+----------------------------------------------------------------------
+  Test                                                 Distance      Verdict
+  ────────────────────────────────────────────────── ────────── ────────────
+[hamming] dual distance is 0
+  PDF vs. itself (self-test)                                  0        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] pdf dual hash (2 pages): fe13fd13815481ff81d783178fc78fc2ce82ce02ca8ecaeecaeeea88ea08c2a8|5080c1b400018280800000008000800060000000000000000000000000000500:ef87ba51b9e181fb9cfec70ece18f80db834a3ff85fc911ec700f402e400c447|492b2423b012320a90029801582018005a401a10188018801880104050001820
+[hamming] dual distance is 7
+  PDF pages JPEG-compressed (quality=40)                      7        MATCH
+[phash] extracting dual hash (hash_size=16)...
+[phash] pdf dual hash (2 pages): fe13fd13815481ff81df81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|5884c19080018280900000008000800060000000000000000000000000000402:ef87ba51b9e181fb9cfec70ece18f80db830a3ff85fd911ec700f402e400c447|080a2503b0023302900298005800180018401820188018801880104050001800
+[hamming] dual distance is 13
+  PDF with page 2 brightness -40% (tampered)                 13    UNCERTAIN
+[phash] extracting dual hash (hash_size=16)...
+[phash] pdf dual hash (1 pages): fe13fd13815481ff81df81178fc78fc2cf82ce02c80ecaeecafeea88ea08c2a8|5884c19080018280900000008000800060000000000000000000000000000402
+  PDF page count mismatch (2 vs 1 page)                    9999     REJECTED
+[phash] extracting dual hash (hash_size=16)...
+[phash] dual hash result: fe13fd13815481fe81df81178fc78fc2cf82ce02c80ecafecafeea88ea08c2a8|588049b480018280800000008000800060000000000000000000000000000412
+[hamming] dual distance is 6
+  PDF page 1 vs. original.png (DPI rendering)                 6        MATCH
+
+  Interpretation:
+  - PDF compression resilience works identically to images (distance=7)
+  - Single tampered page is detected via max() across pages
+  - Page count mismatch is automatically rejected (distance=9999)
+  - PDF rendering at 200 DPI introduces minor distance vs raw image
+

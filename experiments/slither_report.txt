@@ -1,0 +1,17 @@
+'solc --version' running
+'solc contracts/ImageRegistry.sol --combined-json abi,ast,bin,bin-runtime,srcmap,srcmap-runtime,userdoc,devdoc,hashes --allow-paths .,/Users/robertaron/disertatie/contracts' running
+INFO:Detectors:
+Detector: solc-version
+Version constraint 0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- VerbatimInvalidDeduplication
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess.
+It is used by:
+	- 0.8.20 (contracts/ImageRegistry.sol#2)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity
+INFO:Detectors:
+Detector: naming-convention
+Parameter ImageRegistry.anchorImage(string,string)._dualHash (contracts/ImageRegistry.sol#32) is not in mixedCase
+Parameter ImageRegistry.anchorImage(string,string)._context (contracts/ImageRegistry.sol#33) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Slither:contracts/ImageRegistry.sol analyzed (1 contracts with 101 detectors), 3 result(s) found

@@ -51,8 +51,3 @@ desktop.ini
 artifacts/
 cache/
 ignition/deployments/
-
-# ── Test images (root level) ───────────────────────────────────
-/different.png
-/original.png
-/wapp_download.jpeg

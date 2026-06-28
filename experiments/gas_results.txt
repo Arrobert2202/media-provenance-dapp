@@ -1,0 +1,56 @@
+======================================================================
+  EXPERIMENT 4.4: Gas Cost Analysis
+======================================================================
+
+  anchorImage (short context, 4 chars): 276,379 gas
+  anchorImage (medium context, 68 chars): 327,534 gas
+  anchorImage (long context, 152 chars): 373,796 gas
+
+  hasBeenAnchored (view): 27,330 gas
+  getAllRecords (3 records, view): 106,135 gas
+  getRecordCount (view): 23,364 gas
+
+  Duplicate rejection: PASSED (reverted as expected)
+
+----------------------------------------------------------------------
+  COST ANALYSIS TABLE
+----------------------------------------------------------------------
+
+  Contract deployment gas: 858,609
+  Typical anchorImage gas: 327,534
+  Runtime bytecode size: 3,733 bytes (well under 24KB limit)
+
+  ┌──────────────┬────────────┬──────────────────┬──────────────────┐
+  │ Gas Price    │ ETH Price  │ Deploy Cost      │ Anchor Cost      │
+  ├──────────────┼────────────┼──────────────────┼──────────────────┤
+  │ 10 gwei     │ $2500       │ $21.47            │ $8.1883           │
+  │ 20 gwei     │ $2500       │ $42.93            │ $16.3767          │
+  │ 20 gwei     │ $3500       │ $60.10            │ $22.9274          │
+  │ 50 gwei     │ $3500       │ $150.26           │ $57.3185          │
+  │ 100 gwei    │ $3500       │ $300.51           │ $114.6369         │
+  └──────────────┴────────────┴──────────────────┴──────────────────┘
+
+----------------------------------------------------------------------
+  L2 COMPARISON (estimated, ~95% cheaper than mainnet)
+----------------------------------------------------------------------
+  Mainnet anchor (20 gwei, $3500): $22.9274
+  Polygon/Arbitrum equivalent:     $1.1464
+  Cost reduction:                  ~95%
+
+----------------------------------------------------------------------
+  STORAGE COMPARISON: Our system vs. alternatives
+----------------------------------------------------------------------
+
+  ┌────────────────────────────┬──────────────────┬──────────────────┐
+  │ Approach                   │ On-chain data    │ Gas (approx)     │
+  ├────────────────────────────┼──────────────────┼──────────────────┤
+  │ Full image on-chain (5MB)  │ 5,000,000 bytes  │ ~320,000,000     │
+  │ SHA-256 hash only          │ 32 bytes         │ ~45,000          │
+  │ IPFS CID + SHA-256         │ ~80 bytes        │ ~65,000          │
+  │ Our dual hash + context    │ ~200 bytes       │ ~345,000         │
+  └────────────────────────────┴──────────────────┴──────────────────┘
+
+  Note: Our system stores more data than a raw SHA-256 (~7.5x gas),
+  but gains compression-resistant matching. Full image storage is
+  ~925x more expensive and impractical on any EVM chain.
+

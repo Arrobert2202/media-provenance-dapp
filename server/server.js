@@ -195,7 +195,7 @@ app.post("/api/verify", upload.single("file"), async (req, res) => {
 
     for (const record of allRecords) {
       const dist = hammingDistance(phash, record.dualHash);
-      if (dist <= 10 && dist < bestDist) {
+      if (dist < bestDist) {
         bestDist  = dist;
         bestMatch = {
           dualHash : record.dualHash,
@@ -208,17 +208,24 @@ app.post("/api/verify", upload.single("file"), async (req, res) => {
 
     cleanup(req.file.path);
 
-    if (bestMatch) {
-      return res.status(200).json({
-        success : true,
-        verified: true,
-        dualHash: phash,
-        distance: bestDist,
-        record  : bestMatch,
-      });
+    // Ternary verdict based on Hamming distance thresholds
+    let verdict;
+    if (bestDist <= 10) {
+      verdict = "match";
+    } else if (bestDist <= 20) {
+      verdict = "uncertain";
+    } else {
+      verdict = "no_match";
     }
 
-    return res.status(200).json({ success: true, verified: false, dualHash: phash, distance: null, record: null });
+    return res.status(200).json({
+      success : true,
+      verified: verdict === "match",
+      verdict,
+      dualHash: phash,
+      distance: bestDist === Infinity ? null : bestDist,
+      record  : bestMatch,
+    });
   } catch (err) {
     console.error("[verify]", err.message);
     cleanup(req.file.path);
